@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "X.com Gemini Commenter",
+  "version": "1.0",
+  "description": "Автоматична генерація коментарів для X.com за допомогою Google Gemini AI",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://twitter.com/*",
+    "https://x.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://twitter.com/*", "https://x.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ]
+}

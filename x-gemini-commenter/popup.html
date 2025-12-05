@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Gemini Commenter Settings</title>
+  <style>
+    body { width: 300px; padding: 15px; font-family: sans-serif; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, textarea, select { width: 100%; margin-top: 5px; padding: 5px; box-sizing: border-box; }
+    button { margin-top: 15px; width: 100%; padding: 8px; background-color: #1d9bf0; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background-color: #1a8cd8; }
+    .status { margin-top: 10px; color: green; font-size: 0.9em; display: none; }
+  </style>
+</head>
+<body>
+  <h2>Налаштування Gemini</h2>
+  
+  <label for="apiKeys">Gemini API Keys (один на рядок):</label>
+  <textarea id="apiKeys" rows="4" placeholder="Вставте ключі сюди, кожен з нового рядка"></textarea>
+  
+  <label for="myUsername">Мій нікнейм (без @):</label>
+  <input type="text" id="myUsername" placeholder="username (для ігнору своїх постів)">
+
+  <label for="modelName">Model Name:</label>
+  <input type="text" id="modelName" placeholder="gemini-2.0-flash-exp" value="gemini-2.0-flash">
+  
+  <label for="promptStyle">Стиль коментарів (System Prompt):</label>
+  <textarea id="promptStyle" rows="4" placeholder="Наприклад: Ти саркастичний критик. Пиши коротко і по суті."></textarea>
+
+  <label for="language">Мова відповіді:</label>
+  <select id="language">
+    <option value="uk">Українська</option>
+    <option value="en">English</option>
+    <option value="match">Мова твіта (Auto)</option>
+  </select>
+
+  <h3>Автоматизація (Auto-Pilot)</h3>
+  
+  <label style="display:flex; align-items:center; gap: 8px;">
+    <input type="checkbox" id="autoSend" style="width:auto; margin:0;"> 
+    Авто-відправка (Auto-Send)
+  </label>
+
+  <label style="display:flex; align-items:center; gap: 8px; margin-top: 5px;">
+    <input type="checkbox" id="autoLike" style="width:auto; margin:0;"> 
+    Авто-лайк (Auto-Like)
+  </label>
+
+  <label style="display:flex; align-items:center; gap: 8px; margin-top: 5px;">
+    <input type="checkbox" id="verifiedOnly" style="width:auto; margin:0;"> 
+    Тільки верифіковані (Verified Only)
+  </label>
+
+  <label style="display:flex; align-items:center; gap: 8px; margin-top: 5px;">
+    <input type="checkbox" id="skipReplies" style="width:auto; margin:0;" checked> 
+    Пропускати відповіді (Skip Replies)
+  </label>
+  
+  <div style="margin-left: 24px; margin-bottom: 10px;">
+    <label for="likeProbability" style="font-weight:normal; font-size: 0.9em;">Ймовірність лайка (%):</label>
+    <input type="number" id="likeProbability" value="50" min="0" max="100">
+  </div>
+
+  <div style="display:flex; gap:10px;">
+    <div>
+      <label for="minDelay">Min Delay (sec):</label>
+      <input type="number" id="minDelay" value="5" min="2">
+    </div>
+    <div>
+      <label for="maxDelay">Max Delay (sec):</label>
+      <input type="number" id="maxDelay" value="15" min="5">
+    </div>
+  </div>
+
+  <label for="maxComments">Ліміт коментарів (0 = безліміт):</label>
+  <input type="number" id="maxComments" value="0" min="0">
+
+  <button id="saveBtn">Зберегти</button>
+  <div id="status" class="status">Налаштування збережено!</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
