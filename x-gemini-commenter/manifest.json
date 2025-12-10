@@ -1,14 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "X.com Gemini Commenter",
-  "version": "1.0",
-  "description": "Автоматична генерація коментарів для X.com за допомогою Google Gemini AI",
+  "name": "X.com Ollama Commenter",
+  "version": "2.0",
+  "description": "Автоматична генерація коментарів для X.com за допомогою Ollama AI (локально)",
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab"
   ],
   "host_permissions": [
     "https://twitter.com/*",
-    "https://x.com/*"
+    "https://x.com/*",
+    "http://localhost:11434/*",
+    "http://127.0.0.1:11434/*"
   ],
   "action": {
     "default_popup": "popup.html"
@@ -22,5 +25,8 @@
       "js": ["content.js"],
       "css": ["styles.css"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434;"
+  }
 }

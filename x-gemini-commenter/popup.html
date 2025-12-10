@@ -15,17 +15,39 @@
 <body>
   <h2>Налаштування Gemini</h2>
   
-  <label for="apiKeys">Gemini API Keys (один на рядок):</label>
-  <textarea id="apiKeys" rows="4" placeholder="Вставте ключі сюди, кожен з нового рядка"></textarea>
+  <div style="background: #f8f9fa; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 0.8em; border-left: 3px solid #28a745;">
+    <strong>🚀 Status:</strong> Using SDK-style API with gemini-2.5-flash!
+  </div>
+  
+  <div style="background: #d4edda; padding: 8px; border-radius: 4px; margin: 10px 0; border-left: 4px solid #28a745;">
+    <strong>🎉 Переваги Ollama:</strong><br>
+    • Немає лімітів запитів<br>
+    • Повністю локально<br>
+    • Швидкий і надійний<br>
+    • Ніяких API ключів!
+  </div>
   
   <label for="myUsername">Мій нікнейм (без @):</label>
   <input type="text" id="myUsername" placeholder="username (для ігнору своїх постів)">
 
-  <label for="modelName">Model Name:</label>
-  <input type="text" id="modelName" placeholder="gemini-2.0-flash-exp" value="gemini-2.0-flash">
+  <div style="background: #6f42c1; color: white; padding: 8px; border-radius: 4px; margin: 10px 0;">
+    <strong>🧠 Model:</strong> Ollama llama3.2 (ADVANCED)
+    <div style="font-size: 0.8em; margin-top: 4px;">🚀 Краще виконання інструкцій, менше дублювань! ~7GB RAM 🚀</div>
+  </div>
+  
+  <div style="background: #28a745; color: white; padding: 8px; border-radius: 4px; margin: 10px 0;">
+    <strong>🛡️ Захист від повторів:</strong>
+    <div style="font-size: 0.8em; margin-top: 4px;">AI не буде позначати (@) одного користувача двічі за 24 години</div>
+    <div id="mentionStats" style="font-size: 0.7em; margin-top: 4px; opacity: 0.9;"></div>
+  </div>
+  
+  <div style="background: #17a2b8; color: white; padding: 8px; border-radius: 4px; margin: 10px 0;">
+    <strong>🔤 Розпізнавання скорочень:</strong>
+    <div style="font-size: 0.8em; margin-top: 4px;">GM/GN, WAGMI/LFG, BTW/IMO, FOMO/HODL та інші популярні скорочення</div>
+  </div>
   
   <label for="promptStyle">Стиль коментарів (System Prompt):</label>
-  <textarea id="promptStyle" rows="4" placeholder="Наприклад: Ти саркастичний критик. Пиши коротко і по суті."></textarea>
+  <textarea id="promptStyle" rows="4" placeholder="Будь розумним і цікавим співрозмовником. Додавай свою думку або ставь запитання. Пиши природно і дружелюбно.">Будь розумним користувачем Twitter. Пиши змістовні, цікаві коментарі що додають цінність розмові. Можеш погоджуватись, заперечувати, ставити запитання або додавати свою думку.</textarea>
 
   <label for="language">Мова відповіді:</label>
   <select id="language">

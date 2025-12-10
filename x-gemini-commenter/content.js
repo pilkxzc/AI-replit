@@ -6,6 +6,32 @@ const GEMINI_ICON = `
 <span>Generate</span>
 `;
 
+// Function to get user-friendly error messages
+function getUserFriendlyErrorMessage(errorMessage) {
+  if (errorMessage.includes('Extension context invalidated')) {
+    return 'Extension was reloaded. Please refresh the page to continue.';
+  } else if (errorMessage.includes('rate limited') || errorMessage.includes('wait')) {
+    return 'API rate limit reached. Please wait a few minutes before trying again.';
+  } else if (errorMessage.includes('API Key not found')) {
+    return 'Please configure your Gemini API keys in the extension popup.';
+  } else if (errorMessage.includes('All API keys failed') || errorMessage.includes('quota')) {
+    return 'All API keys have exceeded their quotas. Please wait or add more API keys.';
+  } else if (errorMessage.includes('401') || errorMessage.includes('Invalid API key')) {
+    return 'Invalid API key. Please check your API keys in the extension settings.';
+  } else if (errorMessage.includes('429')) {
+    return 'Rate limit exceeded. Please try again in a few minutes.';
+  } else if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+    return 'Model not available. Using fixed model: gemini-2.0-flash';
+  } else {
+    return 'Error generating comment: ' + errorMessage;
+  }
+}
+
+// Function to show user-friendly error messages
+function showUserFriendlyError(errorMessage) {
+  alert(getUserFriendlyErrorMessage(errorMessage));
+}
+
 function createAIButton() {
   const btn = document.createElement('div');
   btn.className = 'gemini-reply-btn';
@@ -47,6 +73,11 @@ function injectButtons() {
         btn.innerHTML = '<span>Generating...</span>';
 
         try {
+          // Check if extension context is still valid
+          if (!chrome.runtime?.id) {
+            throw new Error('Extension context invalidated. Please reload the page.');
+          }
+          
           // Get settings
           const settings = await chrome.storage.sync.get(['geminiPrompt', 'geminiLanguage']);
           
@@ -61,11 +92,11 @@ function injectButtons() {
           if (response.success) {
             openReplyAndInsert(tweet, response.data);
           } else {
-            alert('Error: ' + response.error);
+            showUserFriendlyError(response.error);
           }
         } catch (err) {
           console.error(err);
-          alert('Error generating comment');
+          showUserFriendlyError('Unexpected error occurred');
         } finally {
           btn.classList.remove('gemini-loading');
           btn.innerHTML = GEMINI_ICON;
@@ -96,9 +127,15 @@ async function openReplyAndInsert(tweetElement, text) {
       let editor;
       
       if (modal) {
-        editor = modal.querySelector('[data-testid="tweetTextarea_0"]');
+        editor = modal.querySelector('[data-testid="tweetTextarea_0"]') || 
+                 modal.querySelector('[role="textbox"]') ||
+                 modal.querySelector('.public-DraftEditor-content') ||
+                 modal.querySelector('[contenteditable="true"]');
       } else {
-        editor = document.querySelector('[data-testid="tweetTextarea_0"]');
+        editor = document.querySelector('[data-testid="tweetTextarea_0"]') ||
+                 document.querySelector('[role="textbox"]') ||
+                 document.querySelector('.public-DraftEditor-content') ||
+                 document.querySelector('[contenteditable="true"]');
       }
       
       // Check if editor is visible
@@ -115,15 +152,17 @@ async function openReplyAndInsert(tweetElement, text) {
 }
 
 function insertTextIntoEditor(editorElement, text) {
-  // Focus the editor
+  console.log('🔧 Inserting text into editor:', editorElement);
+  
+  // Focus and click the editor
   editorElement.focus();
   editorElement.click();
 
-  // Select all existing text to replace it (optional, but cleaner)
+  // Clear any existing content by selecting all and deleting
   document.execCommand('selectAll', false, null);
+  document.execCommand('delete', false, null);
 
-  // Method: Simulate Paste
-  // This is the most reliable way to trigger React's internal state update
+  // Method 1: Use the reliable paste simulation
   const dataTransfer = new DataTransfer();
   dataTransfer.setData('text/plain', text);
   
@@ -131,22 +170,65 @@ function insertTextIntoEditor(editorElement, text) {
     clipboardData: dataTransfer,
     bubbles: true,
     cancelable: true,
-    view: window,
     composed: true
   });
   
+  // Dispatch paste event
   editorElement.dispatchEvent(pasteEvent);
-
-  // Fallback: execCommand if paste didn't work visually (though paste is better for React)
-  if (editorElement.innerText.trim() === '') {
-     document.execCommand('insertText', false, text);
-  }
   
-  // Dispatch multiple events to wake up the UI
-  const events = ['input', 'change', 'textInput'];
-  events.forEach(eventType => {
-    editorElement.dispatchEvent(new Event(eventType, { bubbles: true, composed: true }));
-  });
+  // Wait a bit and check if it worked
+  setTimeout(() => {
+    if (!editorElement.innerText || editorElement.innerText.trim() === '') {
+      console.log('🔧 Paste failed, trying execCommand...');
+      
+      // Method 2: Use execCommand insertText
+      editorElement.focus();
+      document.execCommand('insertText', false, text);
+      
+      // Check again
+      setTimeout(() => {
+        if (!editorElement.innerText || editorElement.innerText.trim() === '') {
+          console.log('🔧 execCommand failed, trying direct manipulation...');
+          
+          // Method 3: Direct DOM manipulation as last resort
+          editorElement.innerText = text;
+          
+          // Trigger all possible React events
+          const events = [
+            new Event('input', { bubbles: true, composed: true }),
+            new Event('change', { bubbles: true, composed: true }),
+            new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }),
+            new Event('keyup', { bubbles: true }),
+            new Event('keydown', { bubbles: true })
+          ];
+          
+          events.forEach(event => {
+            editorElement.dispatchEvent(event);
+          });
+        }
+        
+        // Final verification and React state sync
+        const finalEvents = [
+          new Event('input', { bubbles: true }),
+          new Event('change', { bubbles: true }),
+          new Event('blur', { bubbles: true })
+        ];
+        
+        finalEvents.forEach(event => {
+          editorElement.dispatchEvent(event);
+        });
+        
+        // Force React to update by focusing away and back
+        setTimeout(() => {
+          document.body.focus();
+          setTimeout(() => {
+            editorElement.focus();
+          }, 50);
+        }, 100);
+        
+      }, 200);
+    }
+  }, 300);
 }
 
 // Observer to handle infinite scroll
@@ -319,6 +401,9 @@ async function processNextTweetInLoop() {
     // Skip if already processed in this session
     if (tweet.hasAttribute('data-gemini-processed')) continue;
     
+    // Additional check - skip if tweet is currently being processed
+    if (tweet.classList.contains('gemini-processing')) continue;
+    
     // Check persistent history
     const tweetId = getTweetId(tweet);
     if (tweetId && await hasRepliedTo(tweetId)) {
@@ -364,7 +449,11 @@ async function processNextTweetInLoop() {
     return;
   }
 
-  // 3. Scroll to tweet
+  // 3. Mark tweet as being processed to prevent duplicate processing
+  targetTweet.classList.add('gemini-processing');
+  targetTweet.setAttribute('data-gemini-processed', 'true'); // Mark immediately
+  
+  // Scroll to tweet
   targetTweet.scrollIntoView({ behavior: 'smooth', block: 'center' });
   updateStatus(`Found tweet. Waiting delay... (${commentsCount}/${maxCommentsLimit > 0 ? maxCommentsLimit : '∞'})`);
   
@@ -414,6 +503,11 @@ async function processNextTweetInLoop() {
   }
 
   try {
+    // Check if extension context is still valid
+    if (!chrome.runtime?.id) {
+      throw new Error('Extension context invalidated. Please reload the page.');
+    }
+    
     // Call API
     const apiSettings = await chrome.storage.sync.get(['geminiPrompt', 'geminiLanguage']);
     const response = await chrome.runtime.sendMessage({
@@ -423,22 +517,41 @@ async function processNextTweetInLoop() {
       language: apiSettings.geminiLanguage
     });
 
-    if (!response.success) throw new Error(response.error);
+    if (!response.success) {
+      // For auto-pilot, log the error but continue with next tweet
+      console.error('Comment generation failed:', response.error);
+      updateStatus(`Error: ${getUserFriendlyErrorMessage(response.error)}`);
+      throw new Error(response.error);
+    }
 
     // Insert text
     // We need to find the editor again because it's in the modal now
-    const editor = document.querySelector('[data-testid="tweetTextarea_0"]');
+    let editor = document.querySelector('[data-testid="tweetTextarea_0"]');
+    
+    // If not found, try alternative selectors
+    if (!editor) {
+      editor = document.querySelector('[role="textbox"]');
+    }
+    if (!editor) {
+      editor = document.querySelector('.public-DraftEditor-content');
+    }
+    if (!editor) {
+      editor = document.querySelector('[contenteditable="true"]');
+    }
+    
     if (editor) {
+      console.log('🎯 Found editor element:', editor);
       insertTextIntoEditor(editor, response.data);
       updateStatus('Comment inserted.');
       
       // 6. Auto Send if enabled
       if (settings.autoSend) {
-        updateStatus('Auto-sending in 2s...');
-        await wait(2000); // Small delay before clicking send
+        updateStatus('Auto-sending in 3s...');
+        await wait(3000); // Longer delay to ensure text is properly inserted
         
         const sendBtn = document.querySelector('[data-testid="tweetButton"]');
-        if (sendBtn) {
+        if (sendBtn && !sendBtn.disabled) {
+          console.log('🚀 Clicking send button:', sendBtn);
           sendBtn.click();
           commentsCount++; // Increment counter
           
@@ -449,22 +562,31 @@ async function processNextTweetInLoop() {
           updateStatus(`Sent! (${commentsCount}/${maxCommentsLimit > 0 ? maxCommentsLimit : '∞'})`);
           await wait(3000); // Wait for send animation
         } else {
-          updateStatus('Send button not found.');
+          updateStatus('Send button not found or disabled.');
+          console.error('❌ Send button issue:', sendBtn ? 'disabled' : 'not found');
         }
       } else {
         updateStatus('Auto-send OFF. Pausing.');
         stopAutoPilot();
         return; 
       }
+    } else {
+      updateStatus('Editor not found!');
+      console.error('❌ Could not find tweet editor element');
     }
   } catch (err) {
     console.error(err);
     updateStatus('Error generating.');
     closeModal(); // Try to close to recover
+  } finally {
+    // Always remove processing flag
+    targetTweet.classList.remove('gemini-processing');
+    
+    // Close modal after processing to prevent re-entering the same tweet
+    setTimeout(() => {
+      closeModal();
+    }, 1000);
   }
-
-  // Mark as processed (session level)
-  targetTweet.setAttribute('data-gemini-processed', 'true');
 }
 
 function closeModal() {

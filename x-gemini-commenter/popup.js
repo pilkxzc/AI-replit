@@ -1,7 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const apiKeysInput = document.getElementById('apiKeys');
   const myUsernameInput = document.getElementById('myUsername');
-  const modelNameInput = document.getElementById('modelName');
   const promptStyleInput = document.getElementById('promptStyle');
   const languageInput = document.getElementById('language');
   const autoSendInput = document.getElementById('autoSend');
@@ -14,18 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const maxCommentsInput = document.getElementById('maxComments');
   const saveBtn = document.getElementById('saveBtn');
   const status = document.getElementById('status');
+  const mentionStats = document.getElementById('mentionStats');
 
   // Load saved settings
-  chrome.storage.sync.get(['geminiApiKeys', 'geminiApiKey', 'myUsername', 'geminiModel', 'geminiPrompt', 'geminiLanguage', 'autoSend', 'autoLike', 'verifiedOnly', 'skipReplies', 'likeProbability', 'minDelay', 'maxDelay', 'maxComments'], (items) => {
-    // Support for multiple keys or fallback to single key
-    if (items.geminiApiKeys && items.geminiApiKeys.length > 0) {
-      apiKeysInput.value = items.geminiApiKeys.join('\n');
-    } else if (items.geminiApiKey) {
-      apiKeysInput.value = items.geminiApiKey;
-    }
-
+  chrome.storage.sync.get(['myUsername', 'geminiPrompt', 'geminiLanguage', 'autoSend', 'autoLike', 'verifiedOnly', 'skipReplies', 'likeProbability', 'minDelay', 'maxDelay', 'maxComments'], (items) => {
     if (items.myUsername) myUsernameInput.value = items.myUsername;
-    if (items.geminiModel) modelNameInput.value = items.geminiModel;
     if (items.geminiPrompt) promptStyleInput.value = items.geminiPrompt;
     if (items.geminiLanguage) languageInput.value = items.geminiLanguage;
     if (items.autoSend !== undefined) autoSendInput.checked = items.autoSend;
@@ -38,13 +29,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (items.maxComments) maxCommentsInput.value = items.maxComments;
   });
 
+  // Load and display mention statistics
+  chrome.storage.local.get(['mentionHistory'], (data) => {
+    const mentionHistory = data.mentionHistory || {};
+    const count = Object.keys(mentionHistory).length;
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    
+    // Count recent mentions (last 24h)
+    const recentMentions = Object.values(mentionHistory).filter(timestamp => 
+      now - timestamp < oneDayMs
+    ).length;
+    
+    mentionStats.textContent = `Згадано користувачів за 24г: ${recentMentions}`;
+  });
+
   // Save settings
   saveBtn.addEventListener('click', () => {
-    // Split by newline and filter empty strings
-    const apiKeys = apiKeysInput.value.split('\n').map(k => k.trim()).filter(k => k.length > 0);
     const myUsername = myUsernameInput.value.trim().replace('@', '');
-    
-    const model = modelNameInput.value || 'gemini-1.5-flash';
     const prompt = promptStyleInput.value;
     const language = languageInput.value;
     const autoSend = autoSendInput.checked;
@@ -57,9 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const maxComments = parseInt(maxCommentsInput.value, 10) || 0;
 
     chrome.storage.sync.set({
-      geminiApiKeys: apiKeys,
       myUsername: myUsername,
-      geminiModel: model,
       geminiPrompt: prompt,
       geminiLanguage: language,
       autoSend: autoSend,
@@ -77,4 +77,5 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 2000);
     });
   });
+
 });

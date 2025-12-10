@@ -1,0 +1,228 @@
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'generate_comment') {
+    generateCommentWithRetry(request.tweetText, request.prompt, request.language)
+      .then(response => sendResponse({ success: true, data: response }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true; // Will respond asynchronously
+  }
+});
+
+// Clean up expired rate limit data on startup
+chrome.runtime.onStartup.addListener(() => {
+  cleanupExpiredRateLimits();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  cleanupExpiredRateLimits();
+});
+
+// Function to clean up expired rate limit entries
+async function cleanupExpiredRateLimits() {
+  const data = await chrome.storage.sync.get(['rateLimitStatus']);
+  const rateLimitStatus = data.rateLimitStatus || {};
+  
+  const now = Date.now();
+  let hasChanges = false;
+  
+  for (const [keyId, status] of Object.entries(rateLimitStatus)) {
+    if (now > status.resetTime) {
+      delete rateLimitStatus[keyId];
+      hasChanges = true;
+    }
+  }
+  
+  if (hasChanges) {
+    await chrome.storage.sync.set({ rateLimitStatus });
+    console.log('Cleaned up expired rate limit data');
+  }
+}
+
+async function generateCommentWithRetry(tweetText, customPrompt, language) {
+  // Retrieve API keys from storage
+  const data = await chrome.storage.sync.get(['geminiApiKeys', 'geminiApiKey', 'geminiModel', 'rateLimitStatus']);
+  
+  let apiKeys = data.geminiApiKeys || [];
+  // Fallback to single key if array is empty but single key exists
+  if (apiKeys.length === 0 && data.geminiApiKey) {
+    apiKeys = [data.geminiApiKey];
+  }
+
+  if (apiKeys.length === 0) {
+    throw new Error('API Key not found. Please set it in the extension popup.');
+  }
+
+  const modelName = 'gemini-1.5-flash'; // Fixed model
+  const rateLimitStatus = data.rateLimitStatus || {};
+  
+  console.log('🔥 USING MODEL:', modelName); // Debug log
+  
+  // Filter out rate-limited keys
+  const availableKeys = apiKeys.filter(key => {
+    const keyStatus = rateLimitStatus[key.substring(0, 8)];
+    if (!keyStatus) return true;
+    
+    const now = Date.now();
+    return now > keyStatus.resetTime;
+  });
+
+  if (availableKeys.length === 0) {
+    // Find the earliest reset time
+    const resetTimes = Object.values(rateLimitStatus).map(status => status.resetTime);
+    const earliestReset = Math.min(...resetTimes);
+    const waitTime = Math.ceil((earliestReset - Date.now()) / 1000);
+    
+    throw new Error(`All API keys are rate limited. Please wait ${waitTime} seconds before trying again.`);
+  }
+
+  // Shuffle available keys to distribute load
+  const shuffledKeys = [...availableKeys].sort(() => 0.5 - Math.random());
+  let lastError = null;
+
+  for (const apiKey of shuffledKeys) {
+    try {
+      return await callGeminiApi(apiKey, modelName, tweetText, customPrompt, language);
+    } catch (error) {
+      console.error(`API Key failed (${apiKey.substring(0, 5)}...):`, error);
+      lastError = error;
+      
+      // Check for 429 (Rate Limit/Quota Exceeded)
+      const isQuotaError = error.message.includes('429') || error.message.includes('Resource exhausted') || error.message.includes('Quota exceeded');
+      const isAuthError = error.message.includes('401') || error.message.includes('API key not valid');
+
+      if (isQuotaError) {
+        // Extract retry time from error message
+        const retryMatch = error.message.match(/Please retry in ([\d.]+)s/);
+        const retryTime = retryMatch ? parseFloat(retryMatch[1]) * 1000 : 3600000; // Default 1 hour for quota limits
+        
+        await markKeyAsRateLimited(apiKey, retryTime);
+        console.log(`API key quota exceeded for ${Math.ceil(retryTime / 1000)} seconds. Trying next key...`);
+        continue;
+      }
+
+      if (isAuthError) {
+        console.log('Invalid API key. Switching to next key...');
+        continue;
+      }
+
+      // For other errors, try next key
+      continue;
+    }
+  }
+
+  throw new Error('All API keys failed. Last error: ' + (lastError ? lastError.message : 'Unknown'));
+}
+
+// Function to mark an API key as rate limited
+async function markKeyAsRateLimited(apiKey, retryDelayMs) {
+  const data = await chrome.storage.sync.get(['rateLimitStatus']);
+  const rateLimitStatus = data.rateLimitStatus || {};
+  
+  const keyId = apiKey.substring(0, 8);
+  // For quota exceeded errors, set longer reset time (usually daily reset)
+  const resetTime = retryDelayMs > 300000 ? // If more than 5 minutes
+    Date.now() + Math.max(retryDelayMs, 24 * 60 * 60 * 1000) : // At least 24 hours
+    Date.now() + retryDelayMs;
+    
+  rateLimitStatus[keyId] = {
+    resetTime: resetTime,
+    limitedAt: Date.now()
+  };
+  
+  await chrome.storage.sync.set({ rateLimitStatus });
+  
+  console.log(`Marked API key as rate limited until: ${new Date(resetTime).toLocaleString()}`);
+}
+
+// Add delay between requests to avoid hitting rate limits
+async function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Fixed delay for gemini-1.5-flash
+function getModelDelay(modelName) {
+  return 1000; // 1s delay
+}
+
+// Gemini AI Client class (browser-compatible version)
+// Similar to: const ai = new GoogleGenAI({});
+class GeminiAI {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  }
+
+  // Similar to: await ai.models.generateContent({ model, contents })
+  async generateContent({ model, contents }) {
+    await delay(getModelDelay(model)); // Smart rate limiting based on model
+    
+    const apiUrl = `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`;
+    
+    const payload = { contents };
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`${response.status} ${errorData.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content) {
+      return {
+        text: result.candidates[0].content.parts[0].text,
+        candidates: result.candidates
+      };
+    } else {
+      throw new Error('No response generated.');
+    }
+  }
+}
+
+async function callGeminiApi(apiKey, modelName, tweetText, customPrompt, language) {
+  const ai = new GeminiAI(apiKey);
+
+  let baseInstruction = customPrompt || "You are a regular Twitter user. Read the tweet and write a natural, engaging reply.";
+  
+  let languageInstruction = "";
+  if (language === 'uk') {
+    languageInstruction = "OUTPUT LANGUAGE: UKRAINIAN (Українська). Write ONLY in Ukrainian.";
+  } else if (language === 'en') {
+    languageInstruction = "OUTPUT LANGUAGE: ENGLISH. Write ONLY in English. Even if the tweet is in another language, your reply MUST be in English.";
+  }
+
+  const finalPrompt = `
+${languageInstruction}
+
+CONTEXT: You are a real person replying to a tweet on X (Twitter).
+TWEET: "${tweetText}"
+
+YOUR TASK: ${baseInstruction}
+
+STRICT RULES:
+1. Follow the OUTPUT LANGUAGE strictly. If it says English, write in English.
+2. Do NOT translate the tweet.
+3. Do NOT repeat the tweet content.
+4. Do NOT summarize the tweet.
+5. Write a reaction, opinion, or question based on the tweet.
+6. Keep it short (under 280 chars).
+7. Output ONLY the text of the reply. No quotes, no preambles.
+`;
+
+  const response = await ai.generateContent({
+    model: modelName,
+    contents: [{
+      parts: [{
+        text: finalPrompt
+      }]
+    }]
+  });
+
+  return response.text;
+}
