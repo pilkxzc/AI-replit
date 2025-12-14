@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ollama AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      width: 360px; 
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #000;
+      color: #fff;
+    }
+    .header {
+      background: #0a0a0a;
+      padding: 20px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #00ff41;
+      margin-bottom: 6px;
+    }
+    .header .subtitle {
+      font-size: 11px;
+      color: #666;
+      font-weight: 400;
+    }
+    .status-bar {
+      background: #111;
+      padding: 8px 20px;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #00ff41;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #00ff41;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.offline {
+      background: #ff4444;
+      animation: none;
+    }
+    .status-dot.checking {
+      background: #ffaa00;
+      animation: blink 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+    .content {
+      padding: 16px;
+      max-height: 480px;
+      overflow-y: auto;
+      background: #000;
+    }
+    .content::-webkit-scrollbar { width: 6px; }
+    .content::-webkit-scrollbar-track { background: #0a0a0a; }
+    .content::-webkit-scrollbar-thumb { background: #333; }
+    .section {
+      background: #0a0a0a;
+      border: 1px solid #1a1a1a;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #00ff41;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+    label { 
+      display: block; 
+      margin-top: 10px; 
+      font-size: 11px;
+      color: #999;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input[type="text"], 
+    input[type="number"], 
+    textarea, 
+    select { 
+      width: 100%; 
+      margin-top: 6px; 
+      padding: 8px 10px; 
+      border: 1px solid #1a1a1a;
+      background: #111;
+      color: #fff;
+      font-size: 12px;
+      font-family: 'Consolas', monospace;
+      transition: border-color 0.2s;
+    }
+    input::placeholder, textarea::placeholder {
+      color: #444;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #00ff41;
+    }
+    select {
+      cursor: pointer;
+    }
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      cursor: pointer;
+      padding: 6px 0;
+    }
+    .checkbox-wrapper:hover {
+      color: #00ff41;
+    }
+    input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: #00ff41;
+    }
+    .checkbox-wrapper span {
+      font-size: 11px;
+      color: #ccc;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border: 1px solid #1a1a1a;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #111;
+      color: #fff;
+    }
+    .btn-primary {
+      background: #00ff41;
+      color: #000;
+      border-color: #00ff41;
+    }
+    .btn-primary:hover {
+      background: #00cc33;
+      border-color: #00cc33;
+    }
+    .btn-danger {
+      background: #111;
+      color: #ff4444;
+      border-color: #ff4444;
+    }
+    .btn-danger:hover {
+      background: #ff4444;
+      color: #000;
+    }
+    .input-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .input-group input {
+      flex: 1;
+    }
+    .input-group button {
+      width: auto;
+      padding: 8px 12px;
+      background: #00ff41;
+      border: none;
+      color: #000;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .input-group button:hover {
+      background: #00cc33;
+    }
+    .list {
+      margin-top: 10px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .list::-webkit-scrollbar { width: 4px; }
+    .list::-webkit-scrollbar-track { background: #0a0a0a; }
+    .list::-webkit-scrollbar-thumb { background: #333; }
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      background: #111;
+      border: 1px solid #1a1a1a;
+      margin-bottom: 4px;
+    }
+    .list-item span {
+      font-size: 11px;
+      font-family: 'Consolas', monospace;
+      color: #00ff41;
+    }
+    .list-item button {
+      padding: 2px 8px;
+      background: transparent;
+      border: 1px solid #ff4444;
+      color: #ff4444;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .list-item button:hover {
+      background: #ff4444;
+      color: #000;
+    }
+    .info {
+      font-size: 10px;
+      color: #666;
+      margin-top: 6px;
+      padding: 6px 8px;
+      background: #111;
+      border-left: 2px solid #00ff41;
+      line-height: 1.4;
+    }
+    .info.error {
+      border-left-color: #ff4444;
+      color: #ff4444;
+    }
+    .info.warning {
+      border-left-color: #ffaa00;
+      color: #ffaa00;
+    }
+    .split {
+      display: flex;
+      gap: 8px;
+    }
+    .split > div {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚡ Ollama AI</h1>
+    <div class="subtitle">X.com Auto Commenter</div>
+  </div>
+  
+  <div class="status-bar">
+    <div class="status-indicator" id="ollamaStatus">
+      <div class="status-dot"></div>
+      <span>CHECKING...</span>
+    </div>
+    <div style="color: #666;">v3.0</div>
+  </div>
+  
+  <div class="content">
+  
+  <div class="content">
+    <div class="section">
+      <div class="section-title">⚙ CONFIG</div>
+      
+      <label for="myUsername">Username</label>
+      <input type="text" id="myUsername" placeholder="your_username">
+
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="uk">Ukrainian</option>
+        <option value="en">English</option>
+      </select>
+
+      <label for="promptStyle">AI Prompt</label>
+      <textarea id="promptStyle" rows="2" placeholder="System instructions...">Будь розумним користувачем Twitter. Пиши змістовні коментарі.</textarea>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🔌 Ollama Status</div>
+      
+      <div class="info" id="ollamaInfo">Checking connection...</div>
+      <button class="btn btn-primary" id="checkOllamaBtn" style="margin-top: 8px;">Check Connection</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🚫 Blacklist</div>
+      
+      <div class="input-group">
+        <input type="text" id="blacklistInput" placeholder="@username">
+        <button id="addBlacklistBtn">ADD</button>
+      </div>
+
+      <div class="list" id="blacklistList"></div>
+      
+      <div class="info" id="blacklistStats">0 blocked users</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🤖 Autopilot</div>
+      
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="autoSend">
+        <span>Auto-send comments</span>
+      </div>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="autoLike">
+        <span>Auto-like posts</span>
+      </div>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="verifiedOnly">
+        <span>Verified only</span>
+      </div>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="skipReplies" checked>
+        <span>Skip replies</span>
+      </div>
+
+      <label for="likeProbability">Like probability (%)</label>
+      <input type="number" id="likeProbability" value="50" min="0" max="100">
+
+      <div class="split">
+        <div>
+          <label for="minDelay">Min delay (s)</label>
+          <input type="number" id="minDelay" value="5" min="2">
+        </div>
+        <div>
+          <label for="maxDelay">Max delay (s)</label>
+          <input type="number" id="maxDelay" value="15" min="5">
+        </div>
+      </div>
+
+      <label for="maxComments">Comment limit (0 = ∞)</label>
+      <input type="number" id="maxComments" value="0" min="0">
+    </div>
+
+    <div class="section">
+      <div class="section-title">📊 Stats</div>
+      <div class="info" id="mentionStats">Mentions (24h): 0</div>
+    </div>
+
+    <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+    <button class="btn btn-danger" id="clearMentionsBtn">Clear History</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
