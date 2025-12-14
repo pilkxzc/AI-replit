@@ -22,6 +22,8 @@ function getUserFriendlyErrorMessage(errorMessage) {
     return 'Rate limit exceeded. Please try again in a few minutes.';
   } else if (errorMessage.includes('not found') || errorMessage.includes('404')) {
     return 'Model not available. Using fixed model: gemini-2.0-flash';
+  } else if (errorMessage.includes('model crashed') || errorMessage.includes('All models failed')) {
+    return 'Ollama model crashed. Install: ollama pull qwen2.5:0.5b';
   } else {
     return 'Error generating comment: ' + errorMessage;
   }

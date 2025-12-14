@@ -48,27 +48,37 @@ async function cleanupExpiredRateLimits() {
 }
 
 async function generateCommentWithRetry(tweetText, customPrompt, language) {
-  // Use local Ollama - better model for instruction following!
-  const OLLAMA_MODEL = 'llama3.2';
-  console.error('🧠 USING SMARTER OLLAMA MODEL:', OLLAMA_MODEL);
+  // Get saved Ollama model or use default
+  const storage = await chrome.storage.sync.get(['ollamaModel', 'ollamaUrl']);
+  const OLLAMA_MODEL = storage.ollamaModel || 'llama3.2';
+  let ollamaUrl = storage.ollamaUrl || 'http://127.0.0.1:11434';
+  
+  // Normalize URL: force http for local addresses
+  ollamaUrl = ollamaUrl.trim();
+  if (ollamaUrl.startsWith('https://127.') || ollamaUrl.startsWith('https://localhost') || ollamaUrl.startsWith('https://0.0.0.0')) {
+    ollamaUrl = ollamaUrl.replace('https://', 'http://');
+  }
+  if (!ollamaUrl.startsWith('http://') && !ollamaUrl.startsWith('https://')) {
+    ollamaUrl = 'http://' + ollamaUrl;
+  }
+  
+  console.error('🧠 USING OLLAMA MODEL:', OLLAMA_MODEL);
+  console.error('🌐 Normalized Ollama URL:', ollamaUrl);
   
   try {
-    // Test Ollama connectivity first
-    console.error('🔍 Testing Ollama connectivity...');
-    
     return await callOllamaApi(OLLAMA_MODEL, tweetText, customPrompt, language);
   } catch (error) {
-    console.error('❌ Ollama API failed:', error.message);
+    console.error('❌ Model failed:', error.message);
     
-    // Provide specific troubleshooting steps
+    // Provide specific error messages
     if (error.message.includes('Failed to fetch') || error.message.includes('Cannot connect')) {
-      throw new Error('🚨 Ollama Connection Failed!\n\nPlease restart Ollama with CORS support:\n\n1. Open Command Prompt as Administrator\n2. Run: taskkill /F /IM ollama.exe\n3. Run: set OLLAMA_ORIGINS=* && ollama serve\n4. Wait for "Ollama is running" message\n5. Try the extension again');
-    } else if (error.message.includes('timed out') || error.message.includes('60 seconds')) {
-      throw new Error('⏰ Ollama Timeout!\n\nМодель занадто повільна. Спробуйте:\n1. ollama run llama3.2 (попереднє завантаження)\n2. Або швидшу модель: ollama pull llama3.2:1b\n3. Перезапустіть Ollama: set OLLAMA_ORIGINS=* && ollama serve');
-    } else if (error.message.includes('HTTP 404')) {
-      throw new Error('🤖 Model Not Found!\n\nPlease install the model:\n1. ollama pull phi3.5\n2. Wait for download to complete\n3. Try again');
+      throw new Error('🚨 Ollama не запущено!\n\nЗапустіть Ollama:\n\nset OLLAMA_ORIGINS=* && ollama serve');
+    } else if (error.message.includes('404') || error.message.includes('not found')) {
+      throw new Error(`🤖 Модель "${OLLAMA_MODEL}" не знайдено!\n\nВстановіть модель:\n\nollama pull ${OLLAMA_MODEL}`);
+    } else if (error.message.includes('crashed') || error.message.includes('exit status')) {
+      throw new Error(`🔥 Модель "${OLLAMA_MODEL}" зламалась!\n\nПереінсталюйте:\n\nollama pull ${OLLAMA_MODEL}`);
     } else {
-      throw new Error('🔧 Ollama Error: ' + error.message + '\n\nTry restarting Ollama: set OLLAMA_ORIGINS=* && ollama serve');
+      throw new Error('🔧 Помилка Ollama: ' + error.message);
     }
   }
 }
@@ -77,8 +87,8 @@ async function generateCommentWithRetry(tweetText, customPrompt, language) {
 
 // Ollama AI Client class (local API) - Chrome Service Worker Compatible
 class OllamaAI {
-  constructor() {
-    this.baseUrl = 'http://127.0.0.1:11434';
+  constructor(baseUrl = 'http://127.0.0.1:11434') {
+    this.baseUrl = baseUrl;
   }
 
   async generateText(model, prompt) {
@@ -115,6 +125,13 @@ class OllamaAI {
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('🚨 Ollama API Error:', `HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        
+        // Check for specific errors
+        if (errorText.includes('llama runner process has terminated') || errorText.includes('exit status')) {
+          throw new Error('model crashed');
+        }
+        
         throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
@@ -145,7 +162,22 @@ class OllamaAI {
 
 async function callOllamaApi(modelName, tweetText, customPrompt, language) {
   console.error('🤖🤖🤖 callOllamaApi USING MODEL:', modelName);
-  const ai = new OllamaAI();
+  
+  // Get Ollama URL from storage
+  const storage = await chrome.storage.sync.get(['ollamaUrl']);
+  let ollamaUrl = storage.ollamaUrl || 'http://127.0.0.1:11434';
+  
+  // Normalize URL
+  ollamaUrl = ollamaUrl.trim();
+  if (ollamaUrl.startsWith('https://127.') || ollamaUrl.startsWith('https://localhost') || ollamaUrl.startsWith('https://0.0.0.0')) {
+    ollamaUrl = ollamaUrl.replace('https://', 'http://');
+  }
+  if (!ollamaUrl.startsWith('http://') && !ollamaUrl.startsWith('https://')) {
+    ollamaUrl = 'http://' + ollamaUrl;
+  }
+  
+  console.error('🌐 Using Ollama URL:', ollamaUrl);
+  const ai = new OllamaAI(ollamaUrl);
 
   // Ultra-short prompts to prevent rambling and repetition
   let prompt = "";
