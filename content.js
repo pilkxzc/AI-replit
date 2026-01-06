@@ -85,18 +85,24 @@ function injectButtons() {
           // Get settings
           const settings = await chrome.storage.sync.get(['geminiPrompt', 'geminiLanguage']);
           
-          // Send to background
-          const response = await chrome.runtime.sendMessage({
-            action: 'generate_comment',
-            tweetText: text,
-            prompt: settings.geminiPrompt,
-            language: settings.geminiLanguage
-          });
-
-          if (response.success) {
-            openReplyAndInsert(tweet, response.data);
+          // Local variant for GM/GN to avoid repetition
+          const localVariant = maybeGreetingVariant(text, settings.geminiLanguage);
+          if (localVariant) {
+            openReplyAndInsert(tweet, localVariant);
           } else {
-            showUserFriendlyError(response.error);
+            // Send to background
+            const response = await chrome.runtime.sendMessage({
+              action: 'generate_comment',
+              tweetText: text,
+              prompt: settings.geminiPrompt,
+              language: settings.geminiLanguage
+            });
+
+            if (response.success) {
+              openReplyAndInsert(tweet, response.data);
+            } else {
+              showUserFriendlyError(response.error);
+            }
           }
         } catch (err) {
           console.error(err);
@@ -298,33 +304,192 @@ function isReply(tweetElement) {
   return false;
 }
 
-// --- HISTORY MANAGEMENT ---
-async function hasRepliedTo(tweetId) {
-  if (!tweetId) return false;
-  const data = await chrome.storage.local.get(['repliedTweets']);
-  const history = data.repliedTweets || [];
-  return history.includes(tweetId);
+// --- REPUTATION SIGNALS (Ethos / Wallchain / Kaito / Moni) ---
+function parseScoreValue(raw, maxValue) {
+  const n = Number(raw);
+  if (Number.isFinite(n) && n >= 0 && (!maxValue || n <= maxValue)) {
+    return n;
+  }
+  return null;
 }
 
-async function markAsReplied(tweetId) {
-  if (!tweetId) return;
-  const data = await chrome.storage.local.get(['repliedTweets']);
-  let history = data.repliedTweets || [];
-  
-  // Keep history size manageable (e.g., last 1000 tweets)
-  if (history.length > 1000) {
-    history = history.slice(-900);
+function findScoreInAttributes(tweetElement, attrNames, maxValue) {
+  for (const attr of attrNames) {
+    const direct = tweetElement.getAttribute(attr);
+    const parsedDirect = parseScoreValue(direct, maxValue);
+    if (parsedDirect !== null) return parsedDirect;
+
+    const el = tweetElement.querySelector(`[${attr}]`);
+    if (el) {
+      const parsed = parseScoreValue(el.getAttribute(attr), maxValue);
+      if (parsed !== null) return parsed;
+    }
   }
-  
-  if (!history.includes(tweetId)) {
-    history.push(tweetId);
-    await chrome.storage.local.set({ repliedTweets: history });
-  }
+  return null;
 }
 
-// --- AUTO PILOT LOGIC ---
+function findScoreInText(tweetElement, keywords, maxValue) {
+  const nodes = Array.from(tweetElement.querySelectorAll('span, div, a')).slice(0, 80);
+  for (const node of nodes) {
+    const text = (node.innerText || '').trim();
+    if (!text || text.length > 120) continue;
+    for (const key of keywords) {
+      const regex = new RegExp(`${key}[^\n\r\d]{0,6}(\d{1,4}(?:\.\d+)?)`, 'i');
+      const match = text.match(regex);
+      if (match && match[1]) {
+        const parsed = parseScoreValue(match[1], maxValue);
+        if (parsed !== null) return parsed;
+      }
+    }
+  }
+  return null;
+}
 
-let isAutoRunning = false;
+function extractReputationSignals(tweetElement) {
+  const ethos = findScoreInAttributes(tweetElement, ['data-ethos-score', 'data-credibility-score'], 2800) ||
+                findScoreInText(tweetElement, ['Ethos', 'Credibility', 'Cred score'], 2800);
+
+  const wallchain = findScoreInAttributes(tweetElement, ['data-wallchain-score', 'data-x-score'], 1000) ||
+                    findScoreInText(tweetElement, ['X Score', 'Wallchain'], 1000);
+
+  const kaitoYaps = findScoreInAttributes(tweetElement, ['data-yaps-score', 'data-kaito-yaps'], 9999) ||
+                    findScoreInText(tweetElement, ['Yaps', 'Kaito'], 9999);
+
+  const moni = findScoreInAttributes(tweetElement, ['data-moni-score'], 2000) ||
+               findScoreInText(tweetElement, ['Moni', 'Moni Score'], 2000);
+
+  return { ethos, wallchain, kaitoYaps, moni };
+}
+
+function metricPasses(value, min, max) {
+  if (value === null || value === undefined) return null;
+  if (max && max > 0) return value >= min && value <= max;
+  return value >= min;
+}
+
+// --- GREETING VARIANTS (GM/GN) ---
+function detectGreetingType(rawText) {
+  if (!rawText) return null;
+  const t = rawText.toLowerCase();
+  if (/(^|\b)(gm|good\s*morning)\b/.test(t)) return 'morning';
+  if (/(^|\b)(gn|good\s*night|goodnight)\b/.test(t)) return 'night';
+  return null;
+}
+
+function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function buildGreetingVariant(type, lang) {
+  const gm_en = [
+    "gm fam ☀️",
+    "gm frens 🚀",
+    "rise & shine ✨",
+    "morning vibes 🌞",
+    "coffee + focus ☕️",
+    "let’s build today 🔧",
+    "new day, new wins 🟢",
+    "sending good energy ⚡",
+    "stay sharp, ship fast 🏁",
+    "keep it moving ➡️",
+    "gm, keep grinding 💪",
+    "eyes on the prize 🎯",
+    "stack small wins 📈",
+    "clear mind, strong steps 🧠",
+    "create > consume 🛠️",
+    "kindness compiles ❤️",
+    "pace + patience 🧭",
+    "progress over perfection 🔁",
+    "ship it, learn it 📦",
+    "good morning, team 🌤️",
+    "first coffee, then commits ☕️",
+    "light mode: ON 🌅",
+    "shipping mindset today 🚢",
+    "let’s ship responsibly ✅",
+    "code, test, repeat 🔁",
+    "calm focus, strong output 🧘",
+    "iterate and improve ↗️",
+    "steady pace > rush 🐢",
+    "small PRs, quick wins 🧩"
+  ];
+  const gm_uk = [
+    "ГМ, друзі ☀️",
+    "Доброго ранку, ком'юніті 🌞",
+    function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    // Expand greeting templates combinatorially to reach 500+ unique variants while staying concise.
+    function expandVariants(lead, tails, cap) {
+      const out = [];
+      for (const l of lead) {
+        for (const t of tails) {
+          if (out.length >= cap) break;
+          out.push(`${l} ${t}`.trim());
+        }
+        if (out.length >= cap) break;
+      }
+      return out;
+    }
+
+    const gm_en_pool = (() => {
+      const lead = [
+        'gm', 'gm frens', 'gm fam', 'morning vibes', 'rise and ship', 'rise and shine', 'fresh start',
+        'coffee + focus', 'clear head', 'calm focus', 'light mode on', 'build mode on',
+        'small wins', 'ship small', 'iterate daily', 'eyes up', 'steady pace', 'ship safely', 'dev energy',
+        'sprint clean', 'clean commits', 'refactor day', 'shipping mindset', 'good morning team'
+      ];
+      const tails = [
+        '☀️', '🚀', '✨', '🌞', '⚡', '🏁', '📈', '📦', '🧠', '🧘', '✅', '🔧', '🟢', '📜', '🛠️', '🎯', '🐢', '🔁',
+        'more reps', 'less noise', 'ship it', 'test then ship', 'no regressions', 'clean PRs', 'lint first', 'pair later',
+        'hydrate + code', 'docs matter', 'focus mode', 'no scope creep', 'cut scope smart', 'ship responsibly', 'calm speed',
+        'tight loops', 'micro commits', 'CI green', 'review ready', 'merge smart', 'launch smooth', 'iterate fast', 'protect quality'
+      ];
+      return expandVariants(lead, tails, 140);
+    })();
+
+    const gm_uk_pool = (() => {
+      const lead = [
+        'ГМ', 'Доброго ранку', 'Ранковий фокус', 'Світла й натхнення', 'Кава + фокус', 'Чистий старт', 'Будуємо',
+        'Малими кроками', 'Рухаємося вперед', 'Менше шуму', 'Чистий код', 'Шипимо акуратно', 'Гарний день', 'Спокійний темп',
+        'Дисципліна зранку', 'Плануємо й шипимо', 'Свіжий погляд', 'Швидкі перемоги', 'Ранкові вібрації'
+      ];
+      const tails = [
+        '☀️', '🚀', '✨', '🌞', '⚡', '🏁', '📈', '📦', '🧠', '🧘', '✅', '🔧', '🟢', '📜', '🛠️', '🎯', '🐢', '🔁',
+        'менше шуму', 'більше діла', 'швидкі ревʼю', 'акуратні PR', 'без регресій', 'юніт-тести first', 'чіткі задачі',
+        'чисті коміти', 'фокус і кава', 'без поспіху', 'крок за кроком', 'малі таски', 'великий результат', 'скромно й якісно',
+        'план готовий', 'команди гріються', 'світлий день', 'потужний старт'
+      ];
+      return expandVariants(lead, tails, 140);
+    })();
+
+    const gn_en_pool = (() => {
+      const lead = [
+        'gn frens', 'gn fam', 'night mode', 'logging off', 'good night', 'soft landing', 'shutting tabs',
+        'cache cleared', 'rest mode', 'closing IDE', 'shipping tomorrow', 'backups running', 'sleep well',
+        'calm shutdown', 'peaceful exit', 'lights out', 'dream big', 'rest easy', 'see you at sunrise'
+      ];
+      const tails = [
+        '🌙', '✨', '💤', '🌌', '🧘', '🧠', '💾', '🌅', '🔕', '📜', '🚀 tomorrow', 'clean exit', 'deep sleep', 'no pages tonight',
+        'logs saved', 'tests tomorrow', 'PRs can wait', 'stack trace later', 'see you soon', 'restored energy'
+      ];
+      return expandVariants(lead, tails, 130);
+    })();
+
+    const gn_uk_pool = (() => {
+      const lead = [
+        'ГН, друзі', 'Спокійної ночі', 'Вимикаюсь', 'Нічний режим', 'Закриваю вкладки', 'Логаут', 'Бекап думок',
+        'Мрій сміливо', 'Спимо зараз', 'Шипимо завтра', 'Тиха ніч', 'Режим сну', 'Чистий розум', 'Мирне вимкнення'
+      ];
+      const tails = [
+        '🌙', '✨', '💤', '🌌', '🧘', '🧠', '💾', '🌅', '🔕', '📜', 'без спаму помилок', 'логів досить', 'коміти завтра',
+        'ніч без алертів', 'тиша і сон', 'без дедлайнів на ніч', 'легких снів', 'мʼяка посадка', 'спокійна пауза'
+      ];
+      return expandVariants(lead, tails, 130);
+    })();
+
+    function buildGreetingVariant(type, lang) {
+      const pool = type === 'morning'
+        ? (lang === 'uk' ? gm_uk_pool : gm_en_pool)
+        : (lang === 'uk' ? gn_uk_pool : gn_en_pool);
+      return randomChoice(pool);
+    }
 let processedTweets = new Set();
 let autoPanel = null;
 let commentsCount = 0;
@@ -453,7 +618,12 @@ async function processNextTweetInLoop() {
   const tweets = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
   
   // Get settings
-  const settings = await chrome.storage.sync.get(['minDelay', 'maxDelay', 'autoSend', 'autoLike', 'verifiedOnly', 'skipReplies', 'likeProbability', 'myUsername', 'blacklist']);
+  const settings = await chrome.storage.sync.get([
+    'minDelay', 'maxDelay', 'autoSend', 'autoLike', 'verifiedOnly', 'skipReplies', 'likeProbability', 'myUsername', 'blacklist',
+    'enableEthosFilter', 'minEthosScore', 'enableWallchainFilter', 'minWallchainScore', 'enableKaitoFilter', 'minKaitoYaps',
+    'enableMoniFilter', 'minMoniScore', 'maxEthosScore', 'maxWallchainScore', 'maxKaitoYaps', 'maxMoniScore',
+    'reputationLogic', 'reputationMissingPolicy'
+  ]);
   const myUsername = settings.myUsername ? settings.myUsername.toLowerCase() : null;
   const blacklist = settings.blacklist || [];
 
@@ -505,6 +675,59 @@ async function processNextTweetInLoop() {
     if (settings.skipReplies !== false) { // Default to true if undefined
       if (isReply(tweet)) {
         console.log(`Skipping reply: @${author}`);
+        tweet.setAttribute('data-gemini-processed', 'true');
+        continue;
+      }
+    }
+
+    // Reputation-based filters (Ethos / Wallchain / Kaito / Moni)
+    const rep = extractReputationSignals(tweet);
+    const logic = settings.reputationLogic || 'any';
+    const missingPolicy = settings.reputationMissingPolicy || 'skip';
+
+    const requirements = [];
+
+    const minEthos = Number(settings.minEthosScore || 0);
+    const maxEthos = Number(settings.maxEthosScore || 0);
+    const minWallchain = Number(settings.minWallchainScore || 0);
+    const maxWallchain = Number(settings.maxWallchainScore || 0);
+    const minKaito = Number(settings.minKaitoYaps || 0);
+    const maxKaito = Number(settings.maxKaitoYaps || 0);
+    const minMoni = Number(settings.minMoniScore || 0);
+    const maxMoni = Number(settings.maxMoniScore || 0);
+
+    const enabledMetrics = [
+      { enabled: settings.enableEthosFilter, value: rep.ethos, min: minEthos, max: maxEthos },
+      { enabled: settings.enableWallchainFilter, value: rep.wallchain, min: minWallchain, max: maxWallchain },
+      { enabled: settings.enableKaitoFilter, value: rep.kaitoYaps, min: minKaito, max: maxKaito },
+      { enabled: settings.enableMoniFilter, value: rep.moni, min: minMoni, max: maxMoni }
+    ];
+
+    let shouldSkip = false;
+    for (const metric of enabledMetrics) {
+      if (!metric.enabled) continue;
+      if (metric.value === null || metric.value === undefined) {
+        if (missingPolicy === 'skip') {
+          shouldSkip = true; break;
+        } else if (missingPolicy === 'zero') {
+          metric.value = 0;
+        } else if (missingPolicy === 'allow') {
+          requirements.push(true); // treat as pass
+          continue;
+        }
+      }
+      const pass = metricPasses(metric.value, metric.min, metric.max);
+      requirements.push(pass === null ? false : pass);
+    }
+
+    if (shouldSkip) {
+      tweet.setAttribute('data-gemini-processed', 'true');
+      continue;
+    }
+
+    if (requirements.length > 0) {
+      const ok = logic === 'all' ? requirements.every(Boolean) : requirements.some(Boolean);
+      if (!ok) {
         tweet.setAttribute('data-gemini-processed', 'true');
         continue;
       }
@@ -584,20 +807,24 @@ async function processNextTweetInLoop() {
       return;
     }
     
-    // Call API
+    // Local GM/GN variant first; fallback to API
     const apiSettings = await chrome.storage.sync.get(['geminiPrompt', 'geminiLanguage']);
-    const response = await chrome.runtime.sendMessage({
-      action: 'generate_comment',
-      tweetText: text,
-      prompt: apiSettings.geminiPrompt,
-      language: apiSettings.geminiLanguage
-    });
+    let generatedText = maybeGreetingVariant(text, apiSettings.geminiLanguage);
+    if (!generatedText) {
+      const response = await chrome.runtime.sendMessage({
+        action: 'generate_comment',
+        tweetText: text,
+        prompt: apiSettings.geminiPrompt,
+        language: apiSettings.geminiLanguage
+      });
 
-    if (!response.success) {
-      // For auto-pilot, log the error but continue with next tweet
-      console.error('Comment generation failed:', response.error);
-      updateStatus(`Error: ${getUserFriendlyErrorMessage(response.error)}`);
-      throw new Error(response.error);
+      if (!response.success) {
+        // For auto-pilot, log the error but continue with next tweet
+        console.error('Comment generation failed:', response.error);
+        updateStatus(`Error: ${getUserFriendlyErrorMessage(response.error)}`);
+        throw new Error(response.error);
+      }
+      generatedText = response.data;
     }
 
     // Insert text
@@ -617,7 +844,7 @@ async function processNextTweetInLoop() {
     
     if (editor) {
       console.log('🎯 Found editor element:', editor);
-      insertTextIntoEditor(editor, response.data);
+      insertTextIntoEditor(editor, generatedText);
       updateStatus('Comment inserted.');
       
       // 6. Auto Send if enabled

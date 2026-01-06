@@ -1,0 +1,135 @@
+/* Styles for the injected button */
+.gemini-reply-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  color: #536471; /* Twitter gray */
+  transition: color 0.2s;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.gemini-reply-btn:hover {
+  color: #1d9bf0; /* Twitter blue */
+}
+
+.gemini-reply-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  margin-right: 4px;
+}
+
+.gemini-loading {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* Auto-Pilot Panel */
+.gemini-auto-panel {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #0a0a0a;
+  color: #fff;
+  border: 1px solid #1a1a1a;
+  padding: 0;
+  z-index: 9999;
+  width: 240px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 4px 20px rgba(0, 255, 65, 0.1);
+  user-select: none;
+}
+
+.gemini-auto-panel-header {
+  background: #111;
+  padding: 10px 12px;
+  cursor: move;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gemini-auto-panel-header:active {
+  cursor: grabbing;
+}
+
+.gemini-auto-panel h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #00ff41;
+}
+
+.gemini-auto-panel-body {
+  padding: 12px;
+}
+
+.gemini-auto-status {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 10px;
+  min-height: 28px;
+  padding: 6px 8px;
+  background: #111;
+  border-left: 2px solid #00ff41;
+  font-family: 'Consolas', monospace;
+}
+
+.gemini-auto-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.gemini-btn {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #1a1a1a;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+.gemini-btn-start {
+  background: #00ff41;
+  color: #000;
+  border-color: #00ff41;
+}
+
+.gemini-btn-start:hover:not(:disabled) {
+  background: #00cc33;
+  border-color: #00cc33;
+}
+
+.gemini-btn-stop {
+  background: #111;
+  color: #ff4444;
+  border-color: #ff4444;
+}
+
+.gemini-btn-stop:hover:not(:disabled) {
+  background: #ff4444;
+  color: #000;
+}
+
+.gemini-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.gemini-panel-drag-indicator {
+  width: 6px;
+  height: 6px;
+  border: 1px solid #00ff41;
+  background: transparent;
+}
