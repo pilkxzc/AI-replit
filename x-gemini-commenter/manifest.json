@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "manifest_version": 3,
   "name": "X.com Ollama AI Commenter",
@@ -29,4 +30,37 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:*;"
   }
+=======
+{
+  "manifest_version": 3,
+  "name": "X.com Ollama AI Commenter",
+  "version": "3.0",
+  "description": " Автоматична генерація коментарів для X.com за допомогою Ollama AI (локально, без лімітів та обмежень). ",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://twitter.com/*",
+    "https://x.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* http://127.0.0.1:*;"
+  }
+>>>>>>> 641080c51c29fb1d58b369090f0543a74bf1b123
 }

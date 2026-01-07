@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html>
 <head>
@@ -463,4 +464,471 @@
 
   <script src="popup.js"></script>
 </body>
+=======
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ollama AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 420px;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(0, 255, 65, 0.08), transparent 28%),
+                  radial-gradient(circle at 80% 0%, rgba(0, 200, 255, 0.06), transparent 30%),
+                  #050505;
+      color: #e6e6e6;
+    }
+    .header {
+      background: linear-gradient(135deg, #0c0c0c 0%, #0d1f12 60%, #0f0f0f 100%);
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #122414;
+      box-shadow: 0 8px 18px rgba(0, 255, 65, 0.08);
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: #00ff41;
+      margin-bottom: 6px;
+    }
+    .header .subtitle {
+      font-size: 11px;
+      color: #9acfae;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+    .status-bar {
+      background: #0a0f0b;
+      padding: 8px 20px;
+      border-bottom: 1px solid #122414;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: #9acfae;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #b5ffd1;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00ff41;
+      box-shadow: 0 0 12px rgba(0, 255, 65, 0.7);
+      animation: pulse 2s infinite;
+    }
+    .status-dot.offline { background: #ff5a5a; box-shadow: 0 0 10px rgba(255, 90, 90, 0.6); animation: none; }
+    .status-dot.checking { background: #ffaa00; box-shadow: 0 0 10px rgba(255, 170, 0, 0.7); animation: blink 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+    .content {
+      padding: 16px;
+      max-height: 520px;
+      overflow-y: auto;
+      background: transparent;
+    }
+    .content::-webkit-scrollbar { width: 6px; }
+    .content::-webkit-scrollbar-track { background: #0a0a0a; }
+    .content::-webkit-scrollbar-thumb { background: #1f3a27; }
+
+    .section {
+      background: rgba(12, 16, 13, 0.92);
+      border: 1px solid #122414;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #77ff9f;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00ff41;
+      box-shadow: 0 0 12px rgba(0, 255, 65, 0.7);
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #9acfae;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%;
+      margin-top: 6px;
+      padding: 10px 12px;
+      border: 1px solid #1c3320;
+      background: #0c120d;
+      color: #e6e6e6;
+      font-size: 12px;
+      font-family: 'Consolas', monospace;
+      border-radius: 8px;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    input::placeholder, textarea::placeholder { color: #4c6a55; }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #00ff41;
+      box-shadow: 0 0 0 2px rgba(0, 255, 65, 0.15);
+      background: #0f1711;
+    }
+    select { cursor: pointer; }
+
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      cursor: pointer;
+      padding: 8px 6px;
+      border-radius: 8px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .checkbox-wrapper:hover { background: rgba(0, 255, 65, 0.06); color: #c8ffd8; }
+    input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: #00ff41;
+    }
+    .checkbox-wrapper span { font-size: 11px; color: #d0e9d8; }
+
+    .btn {
+      width: 100%;
+      padding: 11px;
+      margin-top: 8px;
+      border: 1px solid #1c3320;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, #0f140f 0%, #0e1c12 100%);
+      color: #e6e6e6;
+      border-radius: 10px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+    }
+    .btn:hover { border-color: #00ff41; color: #dfffe9; box-shadow: 0 10px 24px rgba(0, 255, 65, 0.12); }
+    .btn-primary {
+      background: linear-gradient(135deg, #00ff41 0%, #07c13a 100%);
+      color: #051007;
+      border-color: #00ff41;
+      box-shadow: 0 12px 26px rgba(0, 255, 65, 0.25);
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #00e63b 0%, #06aa32 100%); }
+    .btn-danger {
+      background: linear-gradient(135deg, #1a0f0f 0%, #220f0f 100%);
+      color: #ff7777;
+      border-color: #ff4444;
+    }
+    .btn-danger:hover { background: #ff4444; color: #0f0f0f; box-shadow: 0 12px 24px rgba(255, 68, 68, 0.2); }
+
+    .input-group { display: flex; gap: 6px; margin-top: 8px; }
+    .input-group input { flex: 1; }
+    .input-group button {
+      width: auto;
+      padding: 10px 12px;
+      background: #00ff41;
+      border: none;
+      color: #05210b;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 11px;
+      border-radius: 8px;
+      box-shadow: 0 10px 18px rgba(0, 255, 65, 0.18);
+    }
+    .input-group button:hover { background: #00cc33; }
+
+    .list { margin-top: 10px; max-height: 120px; overflow-y: auto; }
+    .list::-webkit-scrollbar { width: 4px; }
+    .list::-webkit-scrollbar-track { background: #0a0a0a; }
+    .list::-webkit-scrollbar-thumb { background: #1f3a27; }
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      background: #0f160f;
+      border: 1px solid #1c3320;
+      margin-bottom: 5px;
+      border-radius: 8px;
+    }
+    .list-item span {
+      font-size: 11px;
+      font-family: 'Consolas', monospace;
+      color: #b5ffd1;
+    }
+    .list-item button {
+      padding: 3px 8px;
+      background: transparent;
+      border: 1px solid #ff4444;
+      color: #ff7777;
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 800;
+      border-radius: 6px;
+    }
+    .list-item button:hover { background: #ff4444; color: #0f0f0f; }
+
+    .info {
+      font-size: 10px;
+      color: #92c7a4;
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: #0f160f;
+      border-left: 3px solid #00ff41;
+      line-height: 1.5;
+      border-radius: 8px;
+    }
+    .info.error { border-left-color: #ff4444; color: #ff7777; }
+    .info.warning { border-left-color: #ffaa00; color: #ffce6b; }
+
+    .split { display: flex; gap: 8px; }
+    .split > div { flex: 1; }
+
+    .actions { display: flex; gap: 10px; margin-top: 10px; }
+    .actions .btn { margin-top: 0; flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚡ Ollama AI</h1>
+    <div class="subtitle">X.com Auto Commenter</div>
+  </div>
+  
+  <div class="status-bar">
+    <div class="status-indicator" id="ollamaStatus">
+      <div class="status-dot"></div>
+      <span>CHECKING...</span>
+    </div>
+    <div style="color: #666;">v3.0</div>
+  </div>
+  
+  <div class="content">
+    <div class="section">
+      <div class="section-title">Presets</div>
+      <label for="presetSelect">Choose a preset</label>
+      <select id="presetSelect">
+        <option value="">-- select --</option>
+        <option value="trust">Trust Only (strict)</option>
+        <option value="builder">Builder (balanced)</option>
+        <option value="fast">Fast Engage (speed)</option>
+        <option value="quiet">Quiet Observer (manual)</option>
+        <option value="open">Open (no filters)</option>
+      </select>
+      <button class="btn" id="applyPresetBtn" style="margin-top:8px;">Apply Preset</button>
+      <div class="info" id="presetDescription" style="margin-top:8px;">Presets instantly apply and save common settings (language, prompt, autopilot, reputation thresholds). Select one to see details.</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">CONFIG</div>
+      
+      <label for="myUsername">Username</label>
+      <input type="text" id="myUsername" placeholder="your_username">
+
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="uk">Ukrainian</option>
+        <option value="en">English</option>
+      </select>
+
+      <label for="promptStyle">AI Prompt</label>
+      <textarea id="promptStyle" rows="2" placeholder="System instructions...">Будь розумним користувачем Twitter. Пиши змістовні коментарі.</textarea>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Ollama Status</div>
+      
+      <label for="ollamaUrl">Ollama URL</label>
+      <input type="text" id="ollamaUrl" placeholder="Auto-detected" readonly>
+      <button class="btn" id="detectOllamaBtn" style="margin-top: 5px; font-size: 0.85em;">Auto-Detect</button>
+      
+      <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+        <input type="checkbox" id="customOllamaUrl" style="width: auto; margin: 0;">
+        Custom URL
+      </label>
+      
+      <div id="customUrlSection" style="display: none;">
+        <input type="text" id="customOllamaInput" placeholder="http://localhost:11434">
+      </div>
+      
+      <label for="ollamaModel">Ollama Model</label>
+      <select id="ollamaModel">
+        <option value="qwen2.5:0.5b">qwen2.5:0.5b (OK) </option>
+        <option value="llama3.2">llama3.2 </option>
+        <option value="phi3.5:latest">phi3.5 </option>
+        <option value="llama3.2:1b">llama3.2:1</option>
+      </select>
+      <small style="color: #666; font-size: 0.8em;">💡 qwen2.5:0.5b is fastest and most stable. Install: <code>ollama pull qwen2.5:0.5b</code></small>
+      
+      <small style="color: #666; font-size: 0.8em;">💡 qwen2.5:0.5b is fastest and most stable. Install: <code>ollama pull qwen2.5:0.5b</code></small>
+      
+      <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.85em;">
+        <strong>⚠️ llama3.2 keeps crashing?</strong><br>
+        Install stable model: <code style="background: #000; color: #0f0; padding: 2px 4px;">ollama pull qwen2.5:0.5b</code><br>
+        Then select it above and save settings.
+      </div>
+      
+      <div id="ollamaNotRunning" style="display:none; margin-top: 10px; padding: 10px; background: #ffe0e0; border-left: 3px solid #ff4444; font-size: 0.85em;">
+        <strong>🛑 Ollama Not Running</strong><br>
+        Start server in terminal:<br>
+        <code style="background: #000; color: #0f0; padding: 4px; display: block; margin: 5px 0;">set OLLAMA_ORIGINS=* && ollama serve</code>
+        Extension will auto-detect when ready.
+      </div>
+      
+      <div class="info" id="ollamaInfo" style="margin-top: 10px;">Checking connection...</div>
+
+    <div class="section">
+      <div class="section-title"> Blacklist</div>
+      
+      <div class="input-group">
+        <input type="text" id="blacklistInput" placeholder="@username">
+        <button id="addBlacklistBtn">ADD</button>
+      </div>
+
+      <div class="list" id="blacklistList"></div>
+      
+      <div class="info" id="blacklistStats">0 blocked users</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Autopilot</div>
+      
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="autoSend">
+        <span>Auto-send comments</span>
+      </div>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="autoLike">
+        <span>Auto-like posts</span>
+      </div>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="verifiedOnly">
+        <span>Verified only</span>
+      </div>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="skipReplies" checked>
+        <span>Skip replies</span>
+      </div>
+
+      <label for="likeProbability">Like probability (%)</label>
+      <input type="number" id="likeProbability" value="50" min="0" max="100">
+
+      <div class="split">
+        <div>
+          <label for="minDelay">Min delay (s)</label>
+          <input type="number" id="minDelay" value="5" min="2">
+        </div>
+        <div>
+          <label for="maxDelay">Max delay (s)</label>
+          <input type="number" id="maxDelay" value="15" min="5">
+        </div>
+      </div>
+
+      <label for="maxComments">Comment limit (0 = ∞)</label>
+      <input type="number" id="maxComments" value="0" min="0">
+    </div>
+
+    <div class="section">
+      <div class="section-title">Reputation Filters</div>
+
+      <label for="reputationLogic">Logic (all vs any)</label>
+      <select id="reputationLogic">
+        <option value="any">ANY enabled metric passes</option>
+        <option value="all">ALL enabled metrics must pass</option>
+      </select>
+
+      <div class="checkbox-wrapper">
+        <input type="checkbox" id="enableEthosFilter">
+        <span>Require Ethos score</span>
+      </div>
+      <label for="minEthosScore">Ethos min (0-2800)</label>
+      <input type="number" id="minEthosScore" value="1600" min="0" max="2800">
+      <label for="maxEthosScore">Ethos max (0 = no max)</label>
+      <input type="number" id="maxEthosScore" value="0" min="0" max="2800">
+
+      <div class="checkbox-wrapper" style="margin-top: 12px;">
+        <input type="checkbox" id="enableWallchainFilter">
+        <span>Require Wallchain X Score</span>
+      </div>
+      <label for="minWallchainScore">Wallchain min (0-1000)</label>
+      <input type="number" id="minWallchainScore" value="150" min="0" max="1000">
+      <label for="maxWallchainScore">Wallchain max (0 = no max)</label>
+      <input type="number" id="maxWallchainScore" value="0" min="0" max="1000">
+
+      <div class="checkbox-wrapper" style="margin-top: 12px;">
+        <input type="checkbox" id="enableKaitoFilter">
+        <span>Require Kaito Yaps</span>
+      </div>
+      <label for="minKaitoYaps">Yaps min (0-9999)</label>
+      <input type="number" id="minKaitoYaps" value="50" min="0" max="9999">
+      <label for="maxKaitoYaps">Yaps max (0 = no max)</label>
+      <input type="number" id="maxKaitoYaps" value="0" min="0" max="9999">
+
+      <div class="checkbox-wrapper" style="margin-top: 12px;">
+        <input type="checkbox" id="enableMoniFilter">
+        <span>Require Moni Score</span>
+      </div>
+      <label for="minMoniScore">Moni min (0-2000)</label>
+      <input type="number" id="minMoniScore" value="200" min="0" max="2000">
+      <label for="maxMoniScore">Moni max (0 = no max)</label>
+      <input type="number" id="maxMoniScore" value="0" min="0" max="2000">
+
+      <label for="reputationMissingPolicy" style="margin-top: 12px;">If a score is missing</label>
+      <select id="reputationMissingPolicy">
+        <option value="skip">Skip tweet (default)</option>
+        <option value="allow">Allow tweet</option>
+        <option value="zero">Treat missing as 0</option>
+      </select>
+
+      <div class="info" style="margin-top: 10px;">
+        Uses data from Ethos, Wallchain, Kaito Radar, Moni if those extensions render scores on the page. Only filters in Autopilot mode; manual Generate stays unchanged.
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title"> Stats</div>
+      <div class="info" id="mentionStats">Mentions (24h): 0</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+      <button class="btn btn-danger" id="clearMentionsBtn">Clear History</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+>>>>>>> 641080c51c29fb1d58b369090f0543a74bf1b123
 </html>
